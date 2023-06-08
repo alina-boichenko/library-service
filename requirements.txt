@@ -14,3 +14,5 @@ drf-spectacular==0.26.2
 inflection==0.5.1
 jsonschema==4.17.3
 pyrsistent==0.19.3
+djangorestframework-simplejwt==5.2.2
+pyjwt==2.7.0
