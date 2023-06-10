@@ -1,4 +1,5 @@
 from django.db import transaction
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import mixins, viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,7 +7,11 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from books.models import Book
 from borrowing.models import Borrowing
-from borrowing.serializers import BorrowingListSerializer, CreateBorrowingSerializer, BorrowingDetailSerializer
+from borrowing.serializers import (
+    BorrowingListSerializer,
+    CreateBorrowingSerializer,
+    BorrowingDetailSerializer
+)
 
 
 class BorrowingViewSet(
@@ -22,10 +27,23 @@ class BorrowingViewSet(
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff is False:
-            return Borrowing.objects.filter(user=user)
+        queryset = self.queryset
 
-        return Borrowing.objects.all()
+        if user.is_staff is False:
+            queryset.filter(user=user)
+
+        if user.is_staff:
+            user_id = self.request.query_params.get("user_id")
+
+            if user_id:
+                queryset = queryset.filter(user_id=user_id)
+
+        is_active = self.request.query_params.get("is_active")
+
+        if is_active:
+            queryset = queryset.filter(actual_return_date__isnull=True)
+
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -46,9 +64,34 @@ class BorrowingViewSet(
         if borrowed_book.inventory != 0:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            Borrowing.objects.create(user_id=user_id, book_id=book_id, expected_return_date=expected_return_date)
+            Borrowing.objects.create(
+                user_id=user_id,
+                book_id=book_id,
+                expected_return_date=expected_return_date
+            )
             borrowed_book.inventory -= 1
             borrowed_book.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        return Response({"detail": "No books available"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "No books available"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="is_active",
+                type=str,
+                description="Filter by active borrowings (still not returned) "
+                            "(ex. ?is_active=null)"
+            ),
+            OpenApiParameter(
+                name="user_id",
+                type=int,
+                description="Parameter for admin users, filter by user id"
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
