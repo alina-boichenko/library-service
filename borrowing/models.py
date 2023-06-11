@@ -21,3 +21,6 @@ class Borrowing(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.email} borrowed the book {self.book.title}"
+
+    class Meta:
+        ordering = ["expected_return_date"]
