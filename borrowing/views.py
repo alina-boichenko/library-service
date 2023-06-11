@@ -1,6 +1,8 @@
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import mixins, viewsets, status
+from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -10,7 +12,8 @@ from borrowing.models import Borrowing
 from borrowing.serializers import (
     BorrowingListSerializer,
     CreateBorrowingSerializer,
-    BorrowingDetailSerializer
+    BorrowingDetailSerializer,
+    ReturnBorrowedBookSerializer,
 )
 
 
@@ -52,6 +55,9 @@ class BorrowingViewSet(
         if self.action == "retrieve":
             return BorrowingDetailSerializer
 
+        if self.action == "return_book":
+            return ReturnBorrowedBookSerializer
+
         return CreateBorrowingSerializer
 
     @transaction.atomic
@@ -77,6 +83,28 @@ class BorrowingViewSet(
             {"detail": "No books available"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    @action(methods=["POST"], detail=True, url_path="return")
+    def return_book(self, request, pk=None):
+        with transaction.atomic():
+            borrowing = self.get_object()
+
+            if not borrowing.actual_return_date:
+                serializer = self.get_serializer(borrowing, data=request.data)
+                serializer.is_valid(raise_exception=True)
+                borrowing.actual_return_date = serializer.validated_data.get(
+                    "actual_return_date"
+                )
+                borrowing.save()
+
+                book_id = borrowing.book_id
+                book = get_object_or_404(Book, id=book_id)
+                book.inventory += 1
+                book.save()
+
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            return Response({"detail": "You cannot return borrowing twice"})
 
     @extend_schema(
         parameters=[
