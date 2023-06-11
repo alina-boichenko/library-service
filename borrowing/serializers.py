@@ -39,3 +39,9 @@ class CreateBorrowingSerializer(serializers.ModelSerializer):
             "book",
             "expected_return_date",
         )
+
+
+class ReturnBorrowedBookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Borrowing
+        fields = ("actual_return_date",)
