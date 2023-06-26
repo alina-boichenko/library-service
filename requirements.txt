@@ -16,3 +16,7 @@ jsonschema==4.17.3
 pyrsistent==0.19.3
 djangorestframework-simplejwt==5.2.2
 pyjwt==2.7.0
+stripe==5.0.0
+aiogram==2.25.1
+psycopg2-binary==2.9.6
+python-dotenv==1.0.0
