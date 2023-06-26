@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -87,7 +89,7 @@ class AuthenticatedBorrowingApiTests(TestCase):
     def test_return_book(self):
         url = f"/api/borrowings/{self.borrowed_book_1.pk}/return/"
         data = {
-            "actual_return_date": "2023-06-01"
+            "actual_return_date": datetime.date.today() + datetime.timedelta(days=3)
         }
         response = self.client.post(url, data, format="json")
 
