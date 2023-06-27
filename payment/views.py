@@ -12,7 +12,7 @@ class CreateCheckoutSessionView(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet
 ):
-    queryset = Payment.objects.all()
+    queryset = Payment.objects.select_related("borrowing")
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
     serializer_class = PaymentSerializer
