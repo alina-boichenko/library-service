@@ -88,9 +88,8 @@ class AuthenticatedBorrowingApiTests(TestCase):
 
     def test_return_book(self):
         url = f"/api/borrowings/{self.borrowed_book_1.pk}/return/"
-        data = {
-            "actual_return_date": datetime.date.today() + datetime.timedelta(days=3)
-        }
+        return_date = datetime.date.today() + datetime.timedelta(days=3)
+        data = {"actual_return_date": return_date}
         response = self.client.post(url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
