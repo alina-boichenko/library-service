@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             name="user",
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
-                related_name="borrowing",
+                related_name="borrowings",
                 to=settings.AUTH_USER_MODEL,
             ),
         ),

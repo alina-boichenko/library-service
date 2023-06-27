@@ -10,12 +10,12 @@ class Borrowing(models.Model):
     actual_return_date = models.DateField(blank=True, null=True)
     book = models.ForeignKey(
         Book,
-        related_name="borrowing",
+        related_name="borrowings",
         on_delete=models.CASCADE
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name="borrowing",
+        related_name="borrowings",
         on_delete=models.CASCADE
     )
 
