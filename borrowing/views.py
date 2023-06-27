@@ -15,8 +15,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from books.models import Book
-from borrowing.management.commands.bot import send_payment_confirmation
+from borrowing.utils.bot import send_payment_confirmation
 from borrowing.models import Borrowing
 from borrowing.serializers import (
     BorrowingListSerializer,
@@ -37,7 +36,7 @@ class BorrowingViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet
 ):
-    queryset = Borrowing.objects.all()
+    queryset = Borrowing.objects.select_related("book", "user")
     authentication_classes = (JWTAuthentication,)
     permission_classes = (IsAuthenticated,)
     serializer_class = CreateBorrowingSerializer
@@ -77,41 +76,23 @@ class BorrowingViewSet(
 
         return CreateBorrowingSerializer
 
-    @transaction.atomic
     def create(self, request, *args, **kwargs):
         user_id = self.request.user.id
         book_id = request.data["book"]
         expected_return_date = request.data["expected_return_date"]
-        borrowed_book = Book.objects.get(pk=book_id)
-
-        if expected_return_date <= str(datetime.date.today()):
-            message = "You cannot select an expected return date in the past"
-            return Response(
-                {"detail": message},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if borrowed_book.inventory != 0:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            Borrowing.objects.create(
-                user_id=user_id,
-                book_id=book_id,
-                expected_return_date=expected_return_date
-            )
-            borrowed_book.inventory -= 1
-            borrowed_book.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(
-            {"detail": "No books available"},
-            status=status.HTTP_400_BAD_REQUEST
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            user_id=user_id,
+            book_id=book_id,
+            expected_return_date=expected_return_date
         )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         responses=PaymentSerializer
     )
-    @action(methods=["POST", "GET"], detail=True, url_path="success")
+    @action(methods=["GET"], detail=True, url_path="success")
     def success_payment(self, request, pk=None):
         """
         Create a new Stripe Session, calculate the total price of borrowing and
@@ -195,32 +176,11 @@ class BorrowingViewSet(
 
     @action(methods=["POST"], detail=True, url_path="return")
     def return_book(self, request, pk=None):
-        with transaction.atomic():
-            borrowing = self.get_object()
-
-            if not borrowing.actual_return_date:
-                serializer = self.get_serializer(borrowing, data=request.data)
-                serializer.is_valid(raise_exception=True)
-                borrowing.actual_return_date = serializer.validated_data.get(
-                    "actual_return_date"
-                )
-                if borrowing.actual_return_date <= datetime.date.today():
-                    message = "You cannot select an return date in the past"
-                    return Response(
-                        {"detail": message},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                borrowing.save()
-
-                book_id = borrowing.book_id
-                book = get_object_or_404(Book, id=book_id)
-                book.inventory += 1
-                book.save()
-
-                return Response(serializer.data, status=status.HTTP_200_OK)
-
-            return Response({"detail": "You cannot return borrowing twice"})
+        borrowing = self.get_object()
+        serializer = self.get_serializer(borrowing, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         parameters=[
