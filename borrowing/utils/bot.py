@@ -57,7 +57,6 @@ async def process_email(message: types.Message, state: FSMContext):
 
         try:
             user = await sync_to_async(User.objects.get)(email=email)
-            await sync_to_async(User.objects.get)(email=email)
             user.telegram_id = message.from_user.id
             await sync_to_async(user.save)()
             await bot.send_message(
