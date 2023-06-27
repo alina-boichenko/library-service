@@ -1,15 +1,14 @@
+import datetime
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher import FSMContext
 from asgiref.sync import sync_to_async
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from django.conf import settings
 
-from borrowing.management.commands.keyboard import inline_keyboard
-from borrowing.management.commands.sqlite_db import (
-    get_active_borrowing,
-    get_overdue_borrowing
-)
-from borrowing.management.commands.states import LibraryStates
+from borrowing.models import Borrowing
+from borrowing.utils.keyboard import inline_keyboard
+from borrowing.utils.states import LibraryStates
 from user.models import User
 
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
@@ -81,14 +80,27 @@ async def process_command(callback_query: types.CallbackQuery):
     command = callback_query.data
     telegram_id = callback_query.from_user.id
     user = await sync_to_async(User.objects.get)(telegram_id=telegram_id)
+    borrowings = Borrowing.objects.filter(
+        user=user, actual_return_date__isnull=True
+    )
 
     if command == "active":
-        result = await get_active_borrowing(user.id)
-        await bot.send_message(telegram_id, result)
+        if borrowings:
+            for borrow in borrowings:
+                await bot.send_message(telegram_id, borrow)
+        else:
+            await bot.send_message(
+                telegram_id, "You have no active borrowings!"
+            )
 
     elif command == "overdue":
-        result = await get_overdue_borrowing(user.id)
-        await bot.send_message(telegram_id, result)
+        if borrowings.filter(expected_return_date__lt=datetime.date.today()):
+            for borrow in borrowings:
+                await bot.send_message(telegram_id, borrow)
+        else:
+            await bot.send_message(
+                telegram_id, "You have no overdue borrowings!"
+            )
 
     else:
         await bot.send_message(
